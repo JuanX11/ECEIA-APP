@@ -1,13 +1,13 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import { VitePWA } from 'vite-plugin-pwa'
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   plugins: [
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'robots.txt'],
+      includeAssets: ['ECEIA_LOGO.jpg', 'robots.txt'],
       manifest: {
         name: 'Asistencia Semillero',
         short_name: 'Asistencia',
@@ -19,22 +19,30 @@ export default defineConfig({
         start_url: '/',
         orientation: 'portrait',
         icons: [
-          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
-          { src: '/icons/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
-        ]
+          { src: '/ECEIA_LOGO.jpg', sizes: '192x192', type: 'image/png' },
+          { src: '/ECEIA_LOGO.jpg', sizes: '512x512', type: 'image/png' },
+          {
+            src: '/ECEIA_LOGO.jpg',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+        ],
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         runtimeCaching: [
           {
-            urlPattern: ({url}) => url.origin === self.location.origin,
+            urlPattern: ({ url }) => url.origin === self.location.origin,
             handler: 'NetworkFirst',
-            options: { cacheName: 'static-cache', expiration: { maxEntries: 200 } }
-          }
-        ]
-      }
-    })
+            options: {
+              cacheName: 'static-cache',
+              expiration: { maxEntries: 200 },
+            },
+          },
+        ],
+      },
+    }),
   ],
-  server: { port: 5173 }
-})
+  server: { port: 5173 },
+});
