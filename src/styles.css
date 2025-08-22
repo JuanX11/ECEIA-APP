@@ -1,0 +1,33 @@
+:root{
+  --bg:#0b1320;
+  --card:#111827;
+  --muted:#94a3b8;
+  --text:#e5e7eb;
+  --primary:#0ea5e9;
+  --accent:#22d3ee;
+  --ok:#22c55e;
+  --warn:#f59e0b;
+  --danger:#ef4444;
+}
+*{box-sizing:border-box}
+html,body,#root{height:100%}
+body{margin:0;background:linear-gradient(180deg,var(--bg),#0e172c);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial}
+.container{max-width:960px;margin:0 auto;padding:16px}
+header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:16px}
+h1{font-size:1.25rem;margin:0;display:flex;align-items:center;gap:8px}
+.app{display:grid;gap:12px}
+.card{background:var(--card);border:1px solid #1f2937;border-radius:16px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.2)}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+input,select,button,textarea{background:#0b1220;border:1px solid #1f2937;color:var(--text);border-radius:12px;padding:10px 12px;outline:none}
+button{cursor:pointer}
+button.primary{background:var(--primary);border-color:#0284c7}
+button.ghost{background:transparent;border-color:#334155}
+.list{display:grid;gap:8px}
+.pill{padding:6px 10px;border-radius:999px;border:1px solid #334155;display:inline-flex;gap:6px;align-items:center}
+.table{width:100%;border-collapse:collapse}
+.table th,.table td{border-bottom:1px solid #334155;padding:10px;text-align:left}
+.grid{display:grid;gap:12px;grid-template-columns: repeat(auto-fit,minmax(240px,1fr));}
+.footer{opacity:.7;font-size:.85rem}
+.install-banner{position:fixed;left:0;right:0;bottom:0;background:#0b1220;border-top:1px solid #1f2937;padding:12px;display:flex;gap:12px;justify-content:center;align-items:center;z-index:50}
+.tag{font-size:.75rem;opacity:.75}
+.link{color:var(--accent);text-decoration:none}
