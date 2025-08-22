@@ -1,4 +1,7 @@
-:root{
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+/* :root{
   --bg:#0b1320;
   --card:#111827;
   --muted:#94a3b8;
@@ -30,4 +33,4 @@ button.ghost{background:transparent;border-color:#334155}
 .footer{opacity:.7;font-size:.85rem}
 .install-banner{position:fixed;left:0;right:0;bottom:0;background:#0b1220;border-top:1px solid #1f2937;padding:12px;display:flex;gap:12px;justify-content:center;align-items:center;z-index:50}
 .tag{font-size:.75rem;opacity:.75}
-.link{color:var(--accent);text-decoration:none}
+.link{color:var(--accent);text-decoration:none} */
