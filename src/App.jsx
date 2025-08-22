@@ -1,25 +1,17 @@
-import { useState } from 'react';
-import Navbar from './components/Navbar';
-import AttendanceForm from './components/AttendanceForm';
-import AttendanceList from './components/AttendanceList';
+import { RangeCalendar } from '@heroui/react';
+import { today, getLocalTimeZone } from '@internationalized/date';
 
-function App() {
-  const [students, setStudents] = useState([]);
-
-  const handleAddStudent = (name) => {
-    setStudents([...students, name]);
-  };
-
+export default function App() {
   return (
-    <div className="min-h-screen bg-gray-100">
-      <Navbar />
-      <div className="p-4 max-w-md mx-auto">
-        <h2 className="text-xl font-bold mb-2">Registro de asistencia</h2>
-        <AttendanceForm onAdd={handleAddStudent} />
-        <AttendanceList students={students} />
-      </div>
+    <div className="flex gap-x-4">
+      <RangeCalendar aria-label="Date (No Selection)" />
+      <RangeCalendar
+        aria-label="Date (Uncontrolled)"
+        defaultValue={{
+          start: today(getLocalTimeZone()),
+          end: today(getLocalTimeZone()).add({ weeks: 1 }),
+        }}
+      />
     </div>
   );
 }
-
-export default App;

@@ -1,9 +1,16 @@
-import React from 'react'
-import { createRoot } from 'react-dom/client'
-import App from './App.jsx'
-import './styles.css'
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App.jsx';
+import './styles.css';
+import { HeroUIProvider } from '@heroui/react';
+import { registerSW } from 'virtual:pwa-register';
 
-const root = createRoot(document.getElementById('root'))
-root.render(<App />)
+registerSW();
 
-// PWA service worker registration is handled by vite-plugin-pwa (autoUpdate)
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <HeroUIProvider>
+      <App />
+    </HeroUIProvider>
+  </React.StrictMode>
+);
