@@ -23,6 +23,8 @@ import {
   ArrowRightStartOnRectangleIcon,
 } from '@heroicons/react/24/outline'; // Importa los iconos de Heroicons
 
+const logo = 'https://i.ibb.co/5gF40cM4/ECEIA-LOGO.jpg'; // Reemplaza con la URL de tu logo
+
 export default function AppNavbar() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -84,12 +86,8 @@ export default function AppNavbar() {
             to="/"
             className="flex items-center gap-2"
           >
-            <img
-              src="\public\ECEIA_LOGO.jpg"
-              alt="ECEIA Logo"
-              className="h-8 w-auto"
-            />
-            <p className="font-bold text-gray-800 hidden sm:block">ECEIA</p>
+            <img src={logo} alt="ECEIA Logo" className="h-8 w-auto" />
+            <p className="font-bold text-gray-800 hidden ">ECEIA</p>
           </NavbarBrand>
         </NavbarContent>
 
