@@ -72,7 +72,7 @@ export default function AppNavbar() {
     },
     {
       name: 'Configuración',
-      path: '/profile',
+      path: '/perfil',
       icon: <Cog6ToothIcon className="w-5 h-5" />,
     },
   ];
@@ -144,6 +144,7 @@ export default function AppNavbar() {
                 {/* Item admin dinámico */}
                 {profile?.role === 'Admin' && (
                   <DropdownItem
+                    as={RouterLink}
                     to="/admin"
                     startContent={
                       <svg

@@ -14,6 +14,7 @@ import Asistencia from './pages/Asistencia';
 import Miembros from './pages/Miembros';
 import ProfileSettings from './pages/ProfileSettings'; // 👈 Nueva página de perfil
 import AppNavbar from './components/AppNavbar';
+import AdminPage from './pages/AdminPage';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -63,6 +64,17 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          {/* ADMIN */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute>
+                <PrivateLayout>
+                  <AdminPage />
+                </PrivateLayout>
+              </ProtectedRoute>
+            }
+          />
 
           <Route
             path="/miembros"
@@ -75,7 +87,7 @@ export default function App() {
             }
           />
 
-          {/* 👇 Nueva ruta para configurar perfil */}
+          {/* Configurar perfil */}
           <Route
             path="/perfil"
             element={
