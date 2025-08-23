@@ -15,6 +15,7 @@ import Miembros from './pages/Miembros';
 import ProfileSettings from './pages/ProfileSettings'; // 👈 Nueva página de perfil
 import AppNavbar from './components/AppNavbar';
 import AdminPage from './pages/AdminPage';
+import Reuniones from './pages/Reuniones';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -27,7 +28,6 @@ function ProtectedRoute({ children }) {
 function PrivateLayout({ children }) {
   return (
     <>
-      <AppNavbar />
       <div className="p-4">{children}</div>
     </>
   );
@@ -47,6 +47,7 @@ export default function App() {
             path="/"
             element={
               <ProtectedRoute>
+                <AppNavbar />
                 <PrivateLayout>
                   <Home />
                 </PrivateLayout>
@@ -71,6 +72,16 @@ export default function App() {
               <ProtectedRoute>
                 <PrivateLayout>
                   <AdminPage />
+                </PrivateLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reuniones"
+            element={
+              <ProtectedRoute>
+                <PrivateLayout>
+                  <Reuniones />
                 </PrivateLayout>
               </ProtectedRoute>
             }

@@ -79,7 +79,7 @@ export default function AppNavbar() {
 
   return (
     <div className="w-full">
-      <Navbar isBordered className="shadow-sm">
+      <Navbar position="sticky" isBordered className="shadow-sm">
         <NavbarContent justify="start">
           <NavbarBrand
             as={RouterLink}
@@ -167,6 +167,16 @@ export default function AppNavbar() {
                     <span className="text-base">Admin</span>
                   </DropdownItem>
                 )}
+                {profile && (
+                  <DropdownItem
+                    as={RouterLink}
+                    to="/reuniones"
+                    className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100"
+                  >
+                    Reuniones
+                  </DropdownItem>
+                )}
+
                 {/* Separador para Cerrar Sesión */}
                 <DropdownItem>
                   <Divider />
