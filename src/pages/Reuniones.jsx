@@ -2,9 +2,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { Card, CardBody, Button, Input } from '@heroui/react';
-import { QRCodeCanvas } from 'qrcode.react';
-import { BrowserMultiFormatReader } from '@zxing/browser';
 import { useNavigate } from 'react-router-dom';
+import { Html5QrcodeScanner } from 'html5-qrcode';
+import { QRCodeCanvas } from 'qrcode.react';
 
 export default function Reuniones() {
   const navigate = useNavigate();
@@ -21,9 +21,10 @@ export default function Reuniones() {
 
   // Miembro states
   const [scanned, setScanned] = useState(false);
-  const [scannerActive, setScannerActive] = useState(false);
-  const videoRef = useRef(null);
-  const codeReader = useRef(null);
+  const qrRef = useRef(null);
+
+  // Para historial de asistentes
+  const [selectedMeetingAttendees, setSelectedMeetingAttendees] = useState([]);
 
   useEffect(() => {
     const init = async () => {
@@ -44,10 +45,28 @@ export default function Reuniones() {
 
       if (!error && data) setProfile(data);
 
-      fetchMeetings();
+      await fetchMeetings();
+
+      // Subscribirse a cambios en asistencia en tiempo real
+      supabase
+        .channel('public:attendees')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'attendees' },
+          (payload) => {
+            if (activeMeeting && payload.new.meeting_id === activeMeeting.id) {
+              setAttendees((prev) => [...prev, payload.new]);
+            }
+          }
+        )
+        .subscribe();
     };
     init();
-  }, [navigate]);
+
+    // Cleanup: cancelar realtime cuando se desmonte
+    return () => supabase.removeAllChannels();
+    // eslint-disable-next-line
+  }, [activeMeeting]);
 
   const fetchMeetings = async () => {
     const { data: active } = await supabase
@@ -75,22 +94,24 @@ export default function Reuniones() {
     setAttendees(data || []);
   };
 
-  // Admin actions
+  // Admin
   const handleCreateMeeting = async () => {
     if (!meetingName || !meetingLeader) return alert('Completa los campos');
 
-    const now = new Date().toISOString();
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('meetings')
       .insert([
         {
           name: meetingName,
           leader: meetingLeader,
           active: true,
-          start_time: now,
+          start_time: new Date().toISOString(),
         },
       ])
+      .select()
       .single();
+
+    if (error) return alert('Error creando reunión');
 
     setActiveMeeting(data);
     setMeetingName('');
@@ -100,54 +121,46 @@ export default function Reuniones() {
 
   const handleCloseMeeting = async () => {
     if (!activeMeeting) return;
-    const now = new Date().toISOString();
     await supabase
       .from('meetings')
-      .update({ active: false, end_time: now })
+      .update({ active: false, end_time: new Date().toISOString() })
       .eq('id', activeMeeting.id);
     setActiveMeeting(null);
     setAttendees([]);
   };
 
-  // Miembro actions: escanear QR
-  const startScanner = async () => {
-    if (!activeMeeting) return alert('No hay reunión activa');
-    setScannerActive(true);
-    codeReader.current = new BrowserMultiFormatReader();
-    try {
-      await codeReader.current.decodeFromVideoDevice(
-        undefined,
-        videoRef.current,
-        async (result, err) => {
-          if (result) {
-            await handleScanQR(result.getText());
-            stopScanner();
-          }
-        }
-      );
-    } catch (e) {
-      console.error('Error al iniciar scanner', e);
-    }
-  };
+  // Miembro
+  const handleScan = async (decodedText) => {
+    if (scanned || !activeMeeting) return;
 
-  const stopScanner = () => {
-    codeReader.current?.reset();
-    setScannerActive(false);
-  };
-
-  const handleScanQR = async (meetingId) => {
-    if (scanned) return;
-    await supabase.from('attendees').insert([
+    // Registrar asistencia
+    const { error } = await supabase.from('attendees').insert([
       {
-        meeting_id: meetingId,
+        meeting_id: activeMeeting.id,
         user_id: user.id,
         full_name: profile.full_name,
         username: profile.username,
       },
     ]);
+
+    if (error) return alert('Error registrando asistencia');
+
     setScanned(true);
     alert('Asistencia registrada ✅');
   };
+
+  // Inicializar QR scanner para miembros
+  useEffect(() => {
+    if (profile?.role !== 'Miembro' || !activeMeeting) return;
+
+    const scanner = new Html5QrcodeScanner(
+      qrRef.current,
+      { fps: 10, qrbox: 250 },
+      false
+    );
+    scanner.render(handleScan);
+    return () => scanner.clear().catch(() => {});
+  }, [profile, activeMeeting]);
 
   if (loading) return <p>Cargando...</p>;
 
@@ -161,19 +174,20 @@ export default function Reuniones() {
               <h2 className="text-xl font-bold">{activeMeeting.name}</h2>
               <p>Dirigida por: {activeMeeting.leader}</p>
               <p>
-                Inicia: {new Date(activeMeeting.start_time).toLocaleString()}
+                Inicio: {new Date(activeMeeting.start_time).toLocaleString()}
               </p>
-              {activeMeeting.end_time && (
-                <p>
-                  Finaliza: {new Date(activeMeeting.end_time).toLocaleString()}
-                </p>
-              )}
-              <Button color="danger" onPress={handleCloseMeeting}>
+              <Button
+                color="danger"
+                className="mt-2"
+                onPress={handleCloseMeeting}
+              >
                 Cerrar Reunión
               </Button>
-              <div className="mt-4 flex flex-col items-center">
+
+              <div className="mt-4 flex flex-col items-center gap-4">
                 <QRCodeCanvas value={activeMeeting.id} size={200} />
                 <h3 className="mt-4 font-semibold">Asistentes</h3>
+                {attendees.length === 0 && <p>No hay asistentes aún</p>}
                 <ul className="mt-2">
                   {attendees.map((a) => (
                     <li key={a.id}>
@@ -208,21 +222,21 @@ export default function Reuniones() {
               <h2 className="text-xl font-bold">Historial de reuniones</h2>
               <div className="flex flex-col gap-2">
                 {meetings.map((m) => (
-                  <Card key={m.id} className="p-2">
+                  <Card
+                    key={m.id}
+                    className="p-2 cursor-pointer"
+                    onClick={() => fetchAttendees(m.id)}
+                  >
                     <CardBody>
                       <p className="font-semibold">{m.name}</p>
                       <p>Dirigida por: {m.leader}</p>
                       <p>
-                        Activa: {m.active ? 'Sí' : 'No'}{' '}
-                        {m.start_time &&
-                          `| Inicia: ${new Date(
-                            m.start_time
-                          ).toLocaleString()}`}
+                        Activa: {m.active ? 'Sí' : 'No'} | Inicio:{' '}
+                        {new Date(m.start_time).toLocaleString()}
                         {m.end_time &&
-                          ` | Finaliza: ${new Date(
-                            m.end_time
-                          ).toLocaleString()}`}
+                          ` | Fin: ${new Date(m.end_time).toLocaleString()}`}
                       </p>
+                      <p>Asistentes: {attendees.length}</p>
                     </CardBody>
                   </Card>
                 ))}
@@ -236,23 +250,13 @@ export default function Reuniones() {
           {activeMeeting ? (
             <Card className="p-4 flex flex-col items-center gap-4">
               <h2 className="text-xl font-bold">{activeMeeting.name}</h2>
-              {!scannerActive && (
-                <Button
-                  color="primary"
-                  onPress={startScanner}
-                  disabled={scanned}
-                >
-                  {scanned ? 'Asistencia Registrada' : 'Escanear QR'}
-                </Button>
-              )}
-              {scannerActive && (
-                <div className="flex flex-col items-center gap-2">
-                  <video ref={videoRef} className="w-64 h-64 border" />
-                  <Button color="danger" onPress={stopScanner}>
-                    Cancelar
-                  </Button>
-                </div>
-              )}
+              <div ref={qrRef} className="w-full flex justify-center"></div>
+              <Button
+                color={scanned ? 'success' : 'primary'}
+                onPress={() => handleScan(activeMeeting.id)}
+              >
+                {scanned ? 'Asistencia Registrada' : 'Marcar Asistencia'}
+              </Button>
             </Card>
           ) : (
             <p>No hay reuniones activas actualmente.</p>
