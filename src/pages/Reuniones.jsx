@@ -24,7 +24,7 @@ export default function Reuniones() {
   const [scanned, setScanned] = useState(false);
   const [scanner, setScanner] = useState(null);
 
-  // ===== Initialization =====
+  // ==== Init user and profile ====
   useEffect(() => {
     const init = async () => {
       const {
@@ -41,12 +41,14 @@ export default function Reuniones() {
 
       if (!error && data) setProfile(data);
 
-      await fetchMeetings();
+      fetchMeetings();
+      if (data?.role === 'Admin') subscribeToAttendeesRealtime();
+      subscribeToMeetingsRealtime();
     };
     init();
   }, [navigate]);
 
-  // ===== Fetch meetings =====
+  // ==== Fetch meetings ====
   const fetchMeetings = async () => {
     const { data: active } = await supabase
       .from('meetings')
@@ -63,13 +65,10 @@ export default function Reuniones() {
     setMeetings(history || []);
     setLoading(false);
 
-    if (active && profile?.role === 'Admin') {
-      fetchAttendees(active.id);
-      subscribeToAttendeesRealtime(active.id);
-    }
+    if (active && profile?.role === 'Admin') fetchAttendees(active.id);
   };
 
-  // ===== Admin Actions =====
+  // ==== Admin actions ====
   const handleCreateMeeting = async () => {
     if (!meetingName || !meetingLeader) return alert('Completa los campos');
 
@@ -89,7 +88,7 @@ export default function Reuniones() {
     setActiveMeeting(data);
     setMeetingName('');
     setMeetingLeader('');
-    setAttendees([]);
+    fetchAttendees(data.id);
     subscribeToAttendeesRealtime(data.id);
   };
 
@@ -106,15 +105,16 @@ export default function Reuniones() {
   const fetchAttendees = async (meetingId) => {
     const { data } = await supabase
       .from('attendees')
-      .select('*')
+      .select('*, profiles(avatar_url)')
       .eq('meeting_id', meetingId)
       .order('scanned_at', { ascending: true });
     setAttendees(data || []);
   };
 
-  const subscribeToAttendeesRealtime = (meetingId) => {
+  const subscribeToAttendeesRealtime = (meetingId = activeMeeting?.id) => {
+    if (!meetingId) return;
     supabase
-      .channel('public:attendees')
+      .channel(`public:attendees:${meetingId}`)
       .on(
         'postgres_changes',
         {
@@ -123,14 +123,44 @@ export default function Reuniones() {
           table: 'attendees',
           filter: `meeting_id=eq.${meetingId}`,
         },
+        (payload) => setAttendees((prev) => [...prev, payload.new])
+      )
+      .subscribe();
+  };
+
+  // ==== Realtime for meetings (historial) ====
+  const subscribeToMeetingsRealtime = () => {
+    supabase
+      .channel('public:meetings')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'meetings' },
         (payload) => {
-          setAttendees((prev) => [...prev, payload.new]);
+          setMeetings((prev) => {
+            const index = prev.findIndex((m) => m.id === payload.new.id);
+            if (payload.eventType === 'INSERT') return [payload.new, ...prev];
+            if (payload.eventType === 'UPDATE') {
+              if (index !== -1) {
+                const updated = [...prev];
+                updated[index] = payload.new;
+                return updated;
+              } else return [payload.new, ...prev];
+            }
+            if (payload.eventType === 'DELETE' && index !== -1) {
+              const updated = [...prev];
+              updated.splice(index, 1);
+              return updated;
+            }
+            return prev;
+          });
+          if (payload.new.active) setActiveMeeting(payload.new);
+          else if (activeMeeting?.id === payload.new.id) setActiveMeeting(null);
         }
       )
       .subscribe();
   };
 
-  // ===== Miembro Actions =====
+  // ==== Miembro actions ====
   const startScanner = async () => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       alert('Tu navegador no soporta cámara');
@@ -165,10 +195,11 @@ export default function Reuniones() {
     setScanned(true);
   };
 
+  // ==== Modal asistentes historial ====
   const handleOpenMeetingDetails = async (meetingId) => {
     const { data } = await supabase
       .from('attendees')
-      .select('*')
+      .select('*, profiles(avatar_url)')
       .eq('meeting_id', meetingId)
       .order('scanned_at', { ascending: true });
     setSelectedMeetingAttendees(data || []);
@@ -179,7 +210,6 @@ export default function Reuniones() {
 
   return (
     <div className="min-h-screen p-4 flex flex-col gap-6">
-      {/* ===== ADMIN VIEW ===== */}
       {profile.role === 'Admin' ? (
         <>
           {activeMeeting ? (
@@ -189,34 +219,27 @@ export default function Reuniones() {
               <p>
                 Inicio: {new Date(activeMeeting.start_time).toLocaleString()}
               </p>
-              <Button
-                color="danger"
-                onPress={handleCloseMeeting}
-                className="mt-2"
-              >
+              <Button color="danger" onPress={handleCloseMeeting}>
                 Cerrar Reunión
               </Button>
               <div className="mt-4 flex flex-col items-center">
                 <QRCodeCanvas value={activeMeeting.id.toString()} size={200} />
                 <h3 className="mt-4 font-semibold">Asistentes</h3>
-                <div className="w-full max-w-md mt-2">
-                  <div className="grid grid-cols-[auto_1fr] gap-2 border-b py-2 px-2 font-semibold">
-                    <span>Avatar</span>
-                    <span>Nombre</span>
+                <div className="w-full max-w-md border border-gray-200 rounded-md overflow-hidden">
+                  <div className="flex bg-gray-100 p-2 font-semibold">
+                    <div className="flex-1">Nombre</div>
+                    <div>Avatar</div>
                   </div>
                   {attendees.map((a) => (
                     <div
                       key={a.id}
-                      className="grid grid-cols-[auto_1fr] gap-2 items-center border-b py-2 px-2"
+                      className="flex items-center p-2 border-t border-gray-100"
                     >
+                      <div className="flex-1">{a.full_name}</div>
                       <Avatar
                         size="sm"
-                        src={a.avatar_url || undefined}
-                        name={a.full_name}
+                        src={a.profiles?.avatar_url || undefined}
                       />
-                      <span>
-                        {a.username} ({a.full_name})
-                      </span>
                     </div>
                   ))}
                 </div>
@@ -276,7 +299,6 @@ export default function Reuniones() {
           )}
         </>
       ) : (
-        /* ===== MIEMBRO VIEW ===== */
         <Card className="p-4 flex flex-col items-center gap-4">
           <h2 className="text-xl font-bold">
             Escanea el QR para registrar tu asistencia
@@ -291,7 +313,6 @@ export default function Reuniones() {
         </Card>
       )}
 
-      {/* ===== Modal de asistentes ===== */}
       <Modal
         open={showAttendeesModal}
         onClose={() => setShowAttendeesModal(false)}
@@ -299,22 +320,15 @@ export default function Reuniones() {
         <h3 className="font-bold text-lg p-2">Asistentes</h3>
         <div className="flex flex-col gap-2 p-2 max-h-96 overflow-y-auto">
           {selectedMeetingAttendees.map((a) => (
-            <Card key={a.id} className="p-2">
-              <CardBody className="flex items-center gap-2">
-                <Avatar
-                  size="sm"
-                  src={a.avatar_url || undefined}
-                  name={a.full_name}
-                />
-                <div>
-                  <p className="font-semibold">{a.username}</p>
-                  <p>{a.full_name}</p>
-                  <p>
-                    Escaneado a las:{' '}
-                    {new Date(a.scanned_at).toLocaleTimeString()}
-                  </p>
-                </div>
-              </CardBody>
+            <Card key={a.id} className="p-2 flex items-center justify-between">
+              <div>
+                <p className="font-semibold">{a.username}</p>
+                <p>{a.full_name}</p>
+                <p>
+                  Escaneado a las: {new Date(a.scanned_at).toLocaleTimeString()}
+                </p>
+              </div>
+              <Avatar size="sm" src={a.profiles?.avatar_url || undefined} />
             </Card>
           ))}
         </div>
