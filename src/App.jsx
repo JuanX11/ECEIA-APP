@@ -28,6 +28,7 @@ function ProtectedRoute({ children }) {
 function PrivateLayout({ children }) {
   return (
     <>
+      <AppNavbar />
       <div className="p-4">{children}</div>
     </>
   );
@@ -47,7 +48,6 @@ export default function App() {
             path="/"
             element={
               <ProtectedRoute>
-                <AppNavbar />
                 <PrivateLayout>
                   <Home />
                 </PrivateLayout>
