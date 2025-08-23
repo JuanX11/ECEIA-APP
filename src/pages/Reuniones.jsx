@@ -1,10 +1,10 @@
 // src/pages/Reuniones.jsx
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Card, CardBody, Button, Input } from '@heroui/react';
-import { useNavigate } from 'react-router-dom';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { Card, CardBody, Button, Input, Modal, Avatar } from '@heroui/react';
 import { QRCodeCanvas } from 'qrcode.react';
+import { useNavigate } from 'react-router-dom';
+import { Html5Qrcode } from 'html5-qrcode';
 
 export default function Reuniones() {
   const navigate = useNavigate();
@@ -12,29 +12,27 @@ export default function Reuniones() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Admin states
   const [activeMeeting, setActiveMeeting] = useState(null);
   const [meetings, setMeetings] = useState([]);
   const [attendees, setAttendees] = useState([]);
   const [meetingName, setMeetingName] = useState('');
   const [meetingLeader, setMeetingLeader] = useState('');
 
-  // Miembro states
-  const [scanned, setScanned] = useState(false);
-  const qrRef = useRef(null);
-
-  // Para historial de asistentes
   const [selectedMeetingAttendees, setSelectedMeetingAttendees] = useState([]);
+  const [showAttendeesModal, setShowAttendeesModal] = useState(false);
 
+  const [scanned, setScanned] = useState(false);
+  const [scanner, setScanner] = useState(null);
+
+  const [attendeesChannel, setAttendeesChannel] = useState(null);
+
+  // Inicialización
   useEffect(() => {
     const init = async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) {
-        navigate('/login');
-        return;
-      }
+      if (!user) return navigate('/login');
       setUser(user);
 
       const { data, error } = await supabase
@@ -45,29 +43,40 @@ export default function Reuniones() {
 
       if (!error && data) setProfile(data);
 
-      await fetchMeetings();
-
-      // Subscribirse a cambios en asistencia en tiempo real
-      supabase
-        .channel('public:attendees')
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'attendees' },
-          (payload) => {
-            if (activeMeeting && payload.new.meeting_id === activeMeeting.id) {
-              setAttendees((prev) => [...prev, payload.new]);
-            }
-          }
-        )
-        .subscribe();
+      fetchMeetings();
     };
     init();
+  }, [navigate]);
 
-    // Cleanup: cancelar realtime cuando se desmonte
-    return () => supabase.removeAllChannels();
-    // eslint-disable-next-line
+  // Suscripción realtime para asistentes
+  useEffect(() => {
+    if (!activeMeeting) return;
+
+    // Limpiar canal anterior
+    if (attendeesChannel) supabase.removeChannel(attendeesChannel);
+
+    const channel = supabase
+      .channel('public:attendees')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'attendees',
+          filter: `meeting_id=eq.${activeMeeting.id}`,
+        },
+        (payload) => setAttendees((prev) => [...prev, payload.new])
+      )
+      .subscribe();
+
+    setAttendeesChannel(channel);
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
   }, [activeMeeting]);
 
+  // Fetch reuniones
   const fetchMeetings = async () => {
     const { data: active } = await supabase
       .from('meetings')
@@ -82,85 +91,96 @@ export default function Reuniones() {
 
     setActiveMeeting(active || null);
     setMeetings(history || []);
-    if (active) fetchAttendees(active.id);
     setLoading(false);
+
+    if (active && profile?.role === 'Admin') fetchAttendees(active.id);
   };
 
-  const fetchAttendees = async (meetingId) => {
-    const { data } = await supabase
-      .from('attendees')
-      .select('*')
-      .eq('meeting_id', meetingId);
-    setAttendees(data || []);
-  };
-
-  // Admin
+  // ===== Admin Actions =====
   const handleCreateMeeting = async () => {
     if (!meetingName || !meetingLeader) return alert('Completa los campos');
 
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('meetings')
       .insert([
         {
           name: meetingName,
           leader: meetingLeader,
           active: true,
-          start_time: new Date().toISOString(),
+          start_time: new Date(),
         },
       ])
-      .select()
       .single();
-
-    if (error) return alert('Error creando reunión');
 
     setActiveMeeting(data);
     setMeetingName('');
     setMeetingLeader('');
-    setAttendees([]);
+    fetchAttendees(data.id);
   };
 
   const handleCloseMeeting = async () => {
     if (!activeMeeting) return;
     await supabase
       .from('meetings')
-      .update({ active: false, end_time: new Date().toISOString() })
+      .update({ active: false, end_time: new Date() })
       .eq('id', activeMeeting.id);
     setActiveMeeting(null);
     setAttendees([]);
   };
 
-  // Miembro
-  const handleScan = async (decodedText) => {
-    if (scanned || !activeMeeting) return;
+  const fetchAttendees = async (meetingId) => {
+    const { data } = await supabase
+      .from('attendees')
+      .select('*')
+      .eq('meeting_id', meetingId)
+      .order('scanned_at', { ascending: true });
+    setAttendees(data || []);
+  };
 
-    // Registrar asistencia
-    const { error } = await supabase.from('attendees').insert([
+  const handleOpenMeetingDetails = async (meetingId) => {
+    const { data } = await supabase
+      .from('attendees')
+      .select('*')
+      .eq('meeting_id', meetingId)
+      .order('scanned_at', { ascending: true });
+    setSelectedMeetingAttendees(data || []);
+    setShowAttendeesModal(true);
+  };
+
+  // ===== Miembro Actions =====
+  const startScanner = async () => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert('Tu navegador no soporta cámara');
+      return;
+    }
+
+    const html5QrCode = new Html5Qrcode('reader');
+    setScanner(html5QrCode);
+
+    await html5QrCode.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      (decodedText) => {
+        handleScanQR(decodedText);
+        html5QrCode.stop();
+        setScanner(null);
+      },
+      (errorMessage) => {}
+    );
+  };
+
+  const handleScanQR = async (meetingId) => {
+    if (scanned) return;
+    const { data } = await supabase.from('attendees').insert([
       {
-        meeting_id: activeMeeting.id,
+        meeting_id: meetingId,
         user_id: user.id,
         full_name: profile.full_name,
         username: profile.username,
       },
     ]);
-
-    if (error) return alert('Error registrando asistencia');
-
     setScanned(true);
-    alert('Asistencia registrada ✅');
   };
-
-  // Inicializar QR scanner para miembros
-  useEffect(() => {
-    if (profile?.role !== 'Miembro' || !activeMeeting) return;
-
-    const scanner = new Html5QrcodeScanner(
-      qrRef.current,
-      { fps: 10, qrbox: 250 },
-      false
-    );
-    scanner.render(handleScan);
-    return () => scanner.clear().catch(() => {});
-  }, [profile, activeMeeting]);
 
   if (loading) return <p>Cargando...</p>;
 
@@ -168,7 +188,6 @@ export default function Reuniones() {
     <div className="min-h-screen p-4 flex flex-col gap-6">
       {profile.role === 'Admin' ? (
         <>
-          {/* ADMIN VIEW */}
           {activeMeeting ? (
             <Card className="p-4">
               <h2 className="text-xl font-bold">{activeMeeting.name}</h2>
@@ -176,25 +195,26 @@ export default function Reuniones() {
               <p>
                 Inicio: {new Date(activeMeeting.start_time).toLocaleString()}
               </p>
-              <Button
-                color="danger"
-                className="mt-2"
-                onPress={handleCloseMeeting}
-              >
+              <Button color="danger" onPress={handleCloseMeeting}>
                 Cerrar Reunión
               </Button>
-
-              <div className="mt-4 flex flex-col items-center gap-4">
-                <QRCodeCanvas value={activeMeeting.id} size={200} />
+              <div className="mt-4 flex flex-col items-center">
+                <QRCodeCanvas value={activeMeeting.id.toString()} size={200} />
                 <h3 className="mt-4 font-semibold">Asistentes</h3>
-                {attendees.length === 0 && <p>No hay asistentes aún</p>}
-                <ul className="mt-2">
+                <div className="mt-2 w-full border rounded overflow-hidden">
                   {attendees.map((a) => (
-                    <li key={a.id}>
-                      {a.username} ({a.full_name})
-                    </li>
+                    <div
+                      key={a.id}
+                      className="flex justify-between items-center p-2 border-b"
+                    >
+                      <div>
+                        <p className="font-semibold">{a.username}</p>
+                        <p className="text-sm text-gray-500">{a.full_name}</p>
+                      </div>
+                      <Avatar src={a.avatar_url || undefined} size="sm" />
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
             </Card>
           ) : (
@@ -224,19 +244,25 @@ export default function Reuniones() {
                 {meetings.map((m) => (
                   <Card
                     key={m.id}
-                    className="p-2 cursor-pointer"
-                    onClick={() => fetchAttendees(m.id)}
+                    className="p-2 cursor-pointer hover:bg-gray-50"
+                    onClick={() => handleOpenMeetingDetails(m.id)}
                   >
                     <CardBody>
                       <p className="font-semibold">{m.name}</p>
                       <p>Dirigida por: {m.leader}</p>
+                      <p>Activa: {m.active ? 'Sí' : 'No'}</p>
                       <p>
-                        Activa: {m.active ? 'Sí' : 'No'} | Inicio:{' '}
-                        {new Date(m.start_time).toLocaleString()}
-                        {m.end_time &&
-                          ` | Fin: ${new Date(m.end_time).toLocaleString()}`}
+                        Inicio:{' '}
+                        {m.start_time
+                          ? new Date(m.start_time).toLocaleString()
+                          : '—'}
                       </p>
-                      <p>Asistentes: {attendees.length}</p>
+                      <p>
+                        Fin:{' '}
+                        {m.end_time
+                          ? new Date(m.end_time).toLocaleString()
+                          : '—'}
+                      </p>
                     </CardBody>
                   </Card>
                 ))}
@@ -245,24 +271,44 @@ export default function Reuniones() {
           )}
         </>
       ) : (
-        <>
-          {/* MIEMBRO VIEW */}
-          {activeMeeting ? (
-            <Card className="p-4 flex flex-col items-center gap-4">
-              <h2 className="text-xl font-bold">{activeMeeting.name}</h2>
-              <div ref={qrRef} className="w-full flex justify-center"></div>
-              <Button
-                color={scanned ? 'success' : 'primary'}
-                onPress={() => handleScan(activeMeeting.id)}
-              >
-                {scanned ? 'Asistencia Registrada' : 'Marcar Asistencia'}
-              </Button>
-            </Card>
-          ) : (
-            <p>No hay reuniones activas actualmente.</p>
-          )}
-        </>
+        <Card className="p-4 flex flex-col items-center gap-4">
+          <h2 className="text-xl font-bold">
+            Escanea el QR para registrar tu asistencia
+          </h2>
+          <div id="reader" className="w-full h-96 bg-gray-100"></div>
+          <Button
+            color={scanned ? 'success' : 'primary'}
+            onPress={startScanner}
+          >
+            {scanned ? 'Asistencia Registrada' : 'Iniciar Escaneo'}
+          </Button>
+        </Card>
       )}
+
+      {/* Modal de asistentes */}
+      <Modal
+        open={showAttendeesModal}
+        onClose={() => setShowAttendeesModal(false)}
+      >
+        <h3 className="font-bold text-lg p-2">Asistentes</h3>
+        <div className="flex flex-col gap-2 p-2 max-h-96 overflow-y-auto">
+          {selectedMeetingAttendees.map((a) => (
+            <Card key={a.id} className="p-2 flex justify-between items-center">
+              <CardBody className="flex justify-between items-center w-full">
+                <div>
+                  <p className="font-semibold">{a.username}</p>
+                  <p className="text-sm text-gray-500">{a.full_name}</p>
+                  <p className="text-xs text-gray-400">
+                    Escaneado a las:{' '}
+                    {new Date(a.scanned_at).toLocaleTimeString()}
+                  </p>
+                </div>
+                <Avatar src={a.avatar_url || undefined} size="sm" />
+              </CardBody>
+            </Card>
+          ))}
+        </div>
+      </Modal>
     </div>
   );
 }
