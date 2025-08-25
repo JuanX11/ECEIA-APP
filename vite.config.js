@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['ECEIA_LOGO.jpg', 'robots.txt'],
       manifest: {
-        name: 'Asistencia Semillero',
-        short_name: 'Asistencia',
+        name: 'ECEIA',
+        short_name: 'ECEIA',
         description: 'PWA de asistencia para semillero de investigación',
         theme_color: '#0ea5e9',
         background_color: '#0b1320',
