@@ -16,23 +16,32 @@ import ProfileSettings from './pages/ProfileSettings'; // 👈 Nueva página de 
 import AppNavbar from './components/AppNavbar';
 import AdminPage from './pages/AdminPage';
 import Reuniones from './pages/Reuniones';
+import LoadingSpinner from './components/LoadingSpinner';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
-  if (loading) return <p>Cargando...</p>;
+  if (loading) return <LoadingSpinner />;
   if (!user) return <Navigate to="/login" replace />;
   return children;
 }
 
 // 👇 Layout que siempre muestra el Navbar + la página privada
+// 👇 PrivateLayout.jsx
 function PrivateLayout({ children }) {
   return (
-    <>
-      <AppNavbar />
-      <div className="p-4">{children}</div>
-    </>
+    <div className="flex flex-col h-screen">
+      {/* Navbar fija arriba */}
+      <AppNavbar className="fixed top-0 left-0 w-full z-50 h-14 md:h-16" />
+
+      {/* Contenido scrollable */}
+      <main className="flex-1 overflow-y-auto  md:pt-16 ">
+        {children}
+      </main>
+    </div>
   );
 }
+
+
 
 export default function App() {
   return (

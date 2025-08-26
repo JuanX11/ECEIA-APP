@@ -3,7 +3,7 @@ import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import AdminView from '../components/AdminView';
 import MemberView from '../components/MemberView';
-
+import LoadingSpinner from '../components/LoadingSpinner';
 export default function Reuniones() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
@@ -29,7 +29,7 @@ export default function Reuniones() {
     init();
   }, [navigate]);
 
-  if (loading) return <p>Cargando...</p>;
+  if (loading) return <LoadingSpinner />;
 
   return (
     <div className="min-h-screen p-4">

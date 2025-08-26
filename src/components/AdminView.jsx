@@ -1,6 +1,14 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './../supabaseClient';
-import { Card, CardBody, Button, Input } from '@heroui/react';
+import {
+  Card, CardBody, Button, Input, Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+
+  useDisclosure,
+} from '@heroui/react';
 import { QRCodeCanvas } from 'qrcode.react';
 import AttendeesModal from './AttendeesModal';
 import MeetingCard from './MeetingCard';
@@ -121,8 +129,10 @@ export default function AdminView({ profile }) {
     setSelectedMeetingAttendees(data || []);
     setShowAttendeesModal(true);
   };
+  const { isOpen, onOpen, onOpenChange } = useDisclosure();
 
   return (
+
     <div className="flex flex-col gap-6">
       {activeMeeting ? (
         <Card className="p-4">
@@ -155,26 +165,44 @@ export default function AdminView({ profile }) {
           </div>
         </Card>
       ) : (
-        <Card className="p-4">
-          <h2 className="text-xl font-bold mb-4">Crear nueva reunión</h2>
-          <Input
-            label="Nombre"
-            value={meetingName}
-            onChange={(e) => setMeetingName(e.target.value)}
-          />
-          <Input
-            label="Dirigida por"
-            value={meetingLeader}
-            onChange={(e) => setMeetingLeader(e.target.value)}
-          />
-          <Button
-            className="mt-4"
-            color="primary"
-            onPress={handleCreateMeeting}
-          >
-            Abrir Reunión
-          </Button>
-        </Card>
+        <>
+          <Card className="z-40 p-4 fixed bottom-0 left-0 w-full shadow-lg ">
+            <Button onPress={onOpen} className="my-3 w-full" color="primary">
+              Iniciar Reunión
+            </Button>
+          </Card>
+
+          <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+            <ModalContent>
+              {(onClose) => (
+                <>
+                  <ModalHeader className="flex flex-col gap-1">Nueva Reunión</ModalHeader>
+                  <ModalBody>
+
+                    <Input
+                      label="Nombre"
+                      value={meetingName}
+                      onChange={(e) => setMeetingName(e.target.value)}
+                    />
+                    <Input
+                      label="Dirigida por"
+                      value={meetingLeader}
+                      onChange={(e) => setMeetingLeader(e.target.value)}
+                    />
+                  </ModalBody>
+                  <ModalFooter>
+                    <Button color="danger" variant="light" onPress={onClose}>
+                      Cancelar
+                    </Button>
+                    <Button color="primary" onPress={handleCreateMeeting}>
+                      Crear
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalContent>
+          </Modal>
+        </>
       )}
 
       {/* Historial: solo si no hay reunión activa */}

@@ -18,6 +18,7 @@ export default function Register() {
   const [formData, setFormData] = useState({
     fullName: '',
     username: '',
+    cellphonenum:'',
     email: '',
     password: '',
     confirmPassword: '',
@@ -50,7 +51,8 @@ export default function Register() {
           data: {
             full_name: formData.fullName,
             username: formData.username,
-            role: 'miembro',
+            role: 'Miembro',
+            cellphonenum:formData.cellphonenum,
           },
         },
       });
@@ -66,6 +68,7 @@ export default function Register() {
             full_name: formData.fullName,
             username: formData.username,
             role: 'miembro',
+            cellphonenum:formData.cellphonenum,
           },
         ]);
         if (profileError) throw profileError;
@@ -104,6 +107,14 @@ export default function Register() {
               value={formData.username}
               onChange={handleChange}
               required
+            />
+             <Input
+              name="cellphonenum"
+              label="Número de Teléfono"
+              value={formData.cellphonenum}
+              onChange={handleChange}
+              required
+              startContent="+57"
             />
             <Input
               name="email"

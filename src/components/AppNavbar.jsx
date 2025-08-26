@@ -5,6 +5,7 @@ import {
   NavbarBrand,
   NavbarContent,
   NavbarItem,
+  User,
   Dropdown,
   DropdownTrigger,
   DropdownMenu,
@@ -12,7 +13,7 @@ import {
   DropdownItem,
   Avatar,
   Link,
-} from '@heroui/react'; // Asegúrate de que los componentes son de @heroui/react o NextUI
+} from '@heroui/react';
 import { supabase } from '../supabaseClient';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import {
@@ -21,6 +22,8 @@ import {
   UserGroupIcon,
   Cog6ToothIcon,
   ArrowRightStartOnRectangleIcon,
+  ChatBubbleBottomCenterIcon,
+  ChatBubbleLeftRightIcon,
 } from '@heroicons/react/24/outline'; // Importa los iconos de Heroicons
 
 const logo = 'https://i.ibb.co/5gF40cM4/ECEIA-LOGO.jpg'; // Reemplaza con la URL de tu logo
@@ -92,18 +95,31 @@ export default function AppNavbar() {
         </NavbarContent>
 
         <NavbarContent justify="end">
+
           {user && (
+
             <Dropdown placement="bottom-end">
               <DropdownTrigger>
-                <Avatar
-                  isBordered
-                  as="button"
-                  className="transition-transform ml-4"
-                  color="primary" // Opcional: Un color para el borde del avatar
-                  size="md"
-                  src={profile?.avatar_url || undefined}
-                  name={profile?.full_name || profile?.username || 'Usuario'}
-                />
+                <div className="flex items-center cursor-pointer w-56 justify-between">
+                  {/* Bloque de textos */}
+                  <div className="flex flex-col items-end">
+                    <span className="font-semibold text-xs">
+                      {profile?.full_name || profile?.username || "Usuario"}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      {profile?.role || "Miembro"}
+                    </span>
+                  </div>
+
+                  {/* Avatar fijo a la derecha */}
+                  <Avatar
+                    isBordered
+                    color="primary"
+                    size="md"
+                    src={profile?.avatar_url || undefined}
+                    name={profile?.username || profile?.username || "U"}
+                  />
+                </div>
               </DropdownTrigger>
               <DropdownMenu
                 aria-label="Menú de usuario"
@@ -172,8 +188,9 @@ export default function AppNavbar() {
                     as={RouterLink}
                     to="/reuniones"
                     className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100"
+                    startContent={<ChatBubbleLeftRightIcon className="w-5 h-5" />}
                   >
-                    Reuniones
+                    <span className="text-base">Reuniones</span>
                   </DropdownItem>
                 )}
 
